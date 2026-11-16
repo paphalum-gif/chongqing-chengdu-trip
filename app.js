@@ -249,26 +249,76 @@ function openCloudPanel(){
   }
 }
 
-async function sendMagicLink(){
-  const email=document.querySelector('#loginEmail')?.value.trim();
+let authMode='login';
+
+function toggleAuthMode(){
+  authMode=authMode==='login'?'signup':'login';
+  const title=document.querySelector('#authTitle');
+  const subtitle=document.querySelector('#authSubtitle');
+  const submit=document.querySelector('#authSubmit');
+  const sw=document.querySelector('#authSwitch');
+  const pass=document.querySelector('#loginPassword');
   const msg=document.querySelector('#authMessage');
-  if(!email){ if(msg) msg.textContent='กรอกอีเมลก่อน'; return; }
-  if(!sb){ if(msg) msg.textContent='ยังเชื่อมต่อ Cloud ไม่สำเร็จ'; return; }
-  const redirectTo='https://chongqing-chengdu-trip.netlify.app/';
-  if(msg) msg.textContent='กำลังส่ง Login Link…';
-  try{
-    const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:redirectTo}});
-    if(error) throw error;
-    const modalBody=document.querySelector('#modalBody');
-    if(modalBody) modalBody.innerHTML=`<div class="modal-title"><div class="eyebrow">CHECK EMAIL</div><h3>ส่ง Login Link แล้ว</h3></div><p>เปิดอีเมล <b>${esc(email)}</b> แล้วกดลิงก์เพื่อกลับเข้า Trip Planning</p><div class="note">ถ้าไม่เห็นอีเมล ให้เช็ก Spam / Promotions และรอประมาณ 1 นาที</div>`;
-    if(msg) msg.textContent='ส่งแล้ว · เช็กอีเมลของคุณ';
-  }catch(error){
-    console.error('Magic Link error',error);
-    const detail=error?.message||error?.name||'Unknown auth error';
-    if(msg) msg.textContent=`ส่งไม่สำเร็จ: ${detail}`;
-    else alert(`ส่ง Login Link ไม่สำเร็จ: ${detail}`);
+  if(authMode==='signup'){
+    if(title) title.textContent='สร้างบัญชี Trip Planning';
+    if(subtitle) subtitle.textContent='สร้างบัญชีเพื่อเก็บทริปและซิงก์ข้อมูลข้ามเครื่อง';
+    if(submit) submit.textContent='สร้างบัญชี';
+    if(sw) sw.textContent='มีบัญชีแล้ว? เข้าสู่ระบบ';
+    if(pass) pass.autocomplete='new-password';
+    if(msg) msg.textContent='ใช้ Email + Password · ไม่ต้องใช้ Magic Link';
+  }else{
+    if(title) title.textContent='เข้าสู่ Trip Planning';
+    if(subtitle) subtitle.textContent='เข้าสู่ระบบเพื่อดูแผนเที่ยว Booking และค่าใช้จ่ายของทริปคุณ';
+    if(submit) submit.textContent='เข้าสู่ระบบ';
+    if(sw) sw.textContent='ยังไม่มีบัญชี? สมัครบัญชี';
+    if(pass) pass.autocomplete='current-password';
+    if(msg) msg.textContent='เข้าสู่ระบบด้วย Email + Password · ไม่ต้องใช้ Magic Link';
   }
 }
+
+async function submitPasswordAuth(){
+  const email=document.querySelector('#loginEmail')?.value.trim();
+  const password=document.querySelector('#loginPassword')?.value||'';
+  const msg=document.querySelector('#authMessage');
+  if(!sb){ if(msg) msg.textContent='ยังเชื่อมต่อ Cloud ไม่สำเร็จ'; return; }
+  if(!email){if(msg)msg.textContent='กรอกอีเมลก่อน';return;}
+  if(password.length<6){if(msg)msg.textContent='Password ต้องมีอย่างน้อย 6 ตัวอักษร';return;}
+  const button=document.querySelector('#authSubmit');
+  if(button)button.disabled=true;
+  if(msg)msg.textContent=authMode==='signup'?'กำลังสร้างบัญชี…':'กำลังเข้าสู่ระบบ…';
+  try{
+    if(authMode==='signup'){
+      const {data,error}=await sb.auth.signUp({email,password});
+      if(error) throw error;
+      if(data.session){
+        if(msg)msg.textContent='สร้างบัญชีสำเร็จ · กำลังเปิดทริป…';
+      }else{
+        if(msg)msg.textContent='สร้างบัญชีแล้ว · ถ้าโปรเจกต์เปิดยืนยันอีเมล ให้ยืนยันอีเมลก่อน แล้วกลับมา Login';
+        authMode='login';
+        toggleAuthMode();
+      }
+    }else{
+      const {data,error}=await sb.auth.signInWithPassword({email,password});
+      if(error) throw error;
+      session=data.session||null;
+      render();
+      await ensureCloudTrip();
+    }
+  }catch(error){
+    console.error('Password auth error',error);
+    let detail=error?.message||'เข้าสู่ระบบไม่สำเร็จ';
+    if(/invalid login credentials/i.test(detail)) detail='อีเมลหรือ Password ไม่ถูกต้อง';
+    if(/email not confirmed/i.test(detail)) detail='อีเมลนี้ยังไม่ได้ยืนยัน · กรุณายืนยันอีเมลครั้งแรกก่อน';
+    if(/user already registered/i.test(detail)) detail='อีเมลนี้มีบัญชีแล้ว · เปลี่ยนเป็น “เข้าสู่ระบบ”';
+    if(msg)msg.textContent=detail;
+  }finally{
+    if(button)button.disabled=false;
+  }
+}
+
+// Kept as a compatibility shim for old cached pages. New UI does not use Magic Link.
+async function sendMagicLink(){ toggleAuthMode(); }
+
 
 async function signOut(){await sb.auth.signOut();session=null;cloudTrip=null;cloudMembers=[];state=JSON.parse(localStorage.getItem(KEY)||'null')||structuredClone(seed);closeModal();render();}
 
@@ -369,7 +419,7 @@ async function bootCloud(){
 }
 
 window.openCloudPanel=openCloudPanel; window.openTripInfo=openTripInfo; window.openJoinPanel=openJoinPanel; window.openTripStartPanel=openTripStartPanel; window.createTrip=createTrip; window.openPlanEditor=openPlanEditor; window.addPlanDay=addPlanDay; window.savePlanDay=savePlanDay; window.saveNewPlanDay=saveNewPlanDay; window.go=go;
-window.filterBooks=filterBooks;window.filterDays=filterDays;window.toggleBook=toggleBook;window.settleExp=settleExp;window.addBooking=addBooking;window.addExpense=addExpense;window.submitBooking=submitBooking;window.submitExpense=submitExpense;window.setEqualSplit=setEqualSplit;window.setCustomSplit=setCustomSplit;window.sendMagicLink=sendMagicLink;window.signOut=signOut;window.joinTrip=joinTrip;
+window.filterBooks=filterBooks;window.filterDays=filterDays;window.toggleBook=toggleBook;window.settleExp=settleExp;window.addBooking=addBooking;window.addExpense=addExpense;window.submitBooking=submitBooking;window.submitExpense=submitExpense;window.setEqualSplit=setEqualSplit;window.setCustomSplit=setCustomSplit;window.submitPasswordAuth=submitPasswordAuth;window.toggleAuthMode=toggleAuthMode;window.sendMagicLink=sendMagicLink;window.signOut=signOut;window.joinTrip=joinTrip;
 
 render(); bootCloud();
 
