@@ -246,51 +246,41 @@ begin
   end;
 end $$;
 
--- v4 compatibility layer for the browser app
-create table if not exists public.trip_days (
-  id uuid primary key default gen_random_uuid(),
-  trip_id uuid not null references public.trips(id) on delete cascade,
-  day_no integer not null,
-  date_label text,
-  city text,
-  items jsonb not null default '[]'::jsonb,
-  created_at timestamptz not null default now()
-);
-alter table public.trip_days enable row level security;
-drop policy if exists trip_days_select on public.trip_days;
-create policy trip_days_select on public.trip_days for select to authenticated using (public.is_trip_member(trip_id));
-drop policy if exists trip_days_write on public.trip_days;
-create policy trip_days_write on public.trip_days for all to authenticated using (public.is_trip_member(trip_id)) with check (public.is_trip_member(trip_id));
 
-alter table public.bookings add column if not exists date_label text;
-alter table public.bookings add column if not exists ref_label text;
-alter table public.bookings add column if not exists ref_url text;
-alter table public.expenses add column if not exists date_label text;
-alter table public.expenses add column if not exists split_a numeric(12,2) default 0;
-alter table public.expenses add column if not exists split_b numeric(12,2) default 0;
-
-create or replace function public.create_trip(p_name text, p_start date, p_end date)
-returns uuid language plpgsql security definer set search_path=public as $$
-declare v_id uuid;
+-- Join a trip by share code without exposing all trips to anonymous/non-members.
+create or replace function public.join_trip_by_code(p_share_code text, p_display_name text default null)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_trip_id uuid;
+  v_name text;
 begin
- if auth.uid() is null then raise exception 'Not authenticated'; end if;
- insert into public.trips(name,start_date,end_date,created_by) values(p_name,p_start,p_end,auth.uid()) returning id into v_id;
- insert into public.trip_members(trip_id,user_id,display_name) values(v_id,auth.uid(),'A');
- return v_id;
-end $$;
-grant execute on function public.create_trip(text,date,date) to authenticated;
+  if auth.uid() is null then
+    raise exception 'Not authenticated';
+  end if;
 
-create or replace function public.join_trip(p_code text)
-returns uuid language plpgsql security definer set search_path=public as $$
-declare v_id uuid;
-begin
- if auth.uid() is null then raise exception 'Not authenticated'; end if;
- select id into v_id from public.trips where upper(share_code)=upper(trim(p_code)) limit 1;
- if v_id is null then raise exception 'Trip code not found'; end if;
- insert into public.trip_members(trip_id,user_id,display_name) values(v_id,auth.uid(),'B')
- on conflict(trip_id,user_id) do nothing;
- return v_id;
-end $$;
-grant execute on function public.join_trip(text) to authenticated;
+  select id into v_trip_id
+  from public.trips
+  where upper(share_code) = upper(trim(p_share_code))
+  limit 1;
 
-insert into storage.buckets(id,name,public) values('trip-files','trip-files',false) on conflict(id) do nothing;
+  if v_trip_id is null then
+    raise exception 'Trip code not found';
+  end if;
+
+  select coalesce(nullif(trim(p_display_name),''), 'Traveler')
+  into v_name;
+
+  insert into public.trip_members(trip_id, user_id, display_name)
+  values (v_trip_id, auth.uid(), v_name)
+  on conflict (trip_id, user_id) do update
+    set display_name = excluded.display_name;
+
+  return v_trip_id;
+end;
+$$;
+
+grant execute on function public.join_trip_by_code(text,text) to authenticated;
