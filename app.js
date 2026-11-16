@@ -95,7 +95,7 @@ function renderPlan(){
   document.querySelector('#days').innerHTML=filtered.map((d,idx)=>{
     const originalIndex=state.days.indexOf(d);
     return `<details class="day-card" ${idx===0?'open':''}>
-      <summary><span class="day-number">D${esc(d[0])}</span><span class="day-meta"><b>${esc(d[1])}</b><small>${esc(d[2])}</small></span><span class="chev">⌄</span></summary>
+      <summary><span class="day-number">D${esc(d[0])}</span><span class="day-meta"><b>${esc(formatDate(d[1]))}</b><small>${esc(d[2])}</small></span><span class="chev">⌄</span></summary>
       <div class="day-content">
         <div class="day-edit-row"><span class="plan-title">${esc(d[5]||('Day '+d[0]))}</span><button class="small-btn" onclick="event.preventDefault();openPlanEditor(${originalIndex})">แก้ไขวันนี้</button></div>
         ${d[3].map((item,i)=>`<div class="stop"><span class="stop-num">${i+1}</span><span>${esc(item)}</span></div>`).join('')}
@@ -184,7 +184,7 @@ async function submitExpense(){
 }
 
 function dateForInput(value){
-  return /^\\d{4}-\\d{2}-\\d{2}$/.test(value)?value:'';
+  return /^\d{4}-\d{2}-\d{2}$/.test(value)?value:'';
 }
 
 function openPlanEditor(index){
@@ -197,13 +197,13 @@ function openPlanEditor(index){
       <label>เมือง<input id="pCity" value="${esc(d[2]||'')}"></label>
     </div>
     <label>ชื่อวัน / จุดประสงค์<input id="pTitle" value="${esc(d[5]||('Day '+d[0]))}" placeholder="เช่น Chongqing · Old Town & Night View"></label>
-    <label>กิจกรรม <small>หนึ่งบรรทัดต่อ 1 กิจกรรม</small><textarea id="pNotes" rows="8" placeholder="10:00 ออกจากโรงแรม\n11:30 午餐\n14:00 ...">${esc(d[3].join('\\n'))}</textarea></label>
+    <label>กิจกรรม <small>หนึ่งบรรทัดต่อ 1 กิจกรรม</small><textarea id="pNotes" rows="8" placeholder="10:00 ออกจากโรงแรม\n11:30 午餐\n14:00 ...">${esc(d[3].join('\n'))}</textarea></label>
     <button class="primary-btn wide" onclick="savePlanDay(${index})">บันทึกแผน</button>`);
 }
 
 async function savePlanDay(index){
   const d=state.days[index];
-  const payload={plan_date:document.querySelector('#pDate').value||null,city:document.querySelector('#pCity').value.trim(),title:document.querySelector('#pTitle').value.trim()||('Day '+d[0]),notes:document.querySelector('#pNotes').value.split('\\n').map(x=>x.trim()).filter(Boolean).join(' · ')};
+  const payload={plan_date:document.querySelector('#pDate').value||null,city:document.querySelector('#pCity').value.trim(),title:document.querySelector('#pTitle').value.trim()||('Day '+d[0]),notes:document.querySelector('#pNotes').value.split('\n').map(x=>x.trim()).filter(Boolean).join(' · ')};
   if(isCloud()){
     const {error}=await sb.from('daily_plans').update(payload).eq('id',d[4]);
     if(error){alert(error.message);return;}
