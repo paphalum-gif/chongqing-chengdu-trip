@@ -296,7 +296,7 @@ function openTripStartPanel(){
 
 async function createTrip(){
   if(!session)return;
-  const {data,error}=await sb.from('trips').insert({name:'My Trip',start_date:null,end_date:null,currency:'THB',created_by:session.user.id}).select().single();
+  const {data,error}=await sb.from('trips').insert({name:'Chongqing → Chengdu',start_date:'2026-12-17',end_date:'2026-12-25',currency:'THB',created_by:session.user.id}).select().single();
   if(error){alert(error.message);return;}
   const {error:memberError}=await sb.from('trip_members').insert({trip_id:data.id,user_id:session.user.id,display_name:'A'});
   if(memberError){alert(memberError.message);return;}
