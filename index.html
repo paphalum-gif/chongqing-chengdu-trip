@@ -4,18 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f7f2ea">
-  <title>Chongqing → Chengdu Trip</title>
+  <title>Trip Planning</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div class="app-shell">
+<div id="authGate" class="auth-gate">  <div class="auth-card">    <div class="auth-mark">✦</div>    <div class="eyebrow">TRIP PLANNING</div>    <h1>วางแผนทริปให้เป็นเรื่องง่าย</h1>    <p>เข้าสู่ระบบเพื่อดูแผนเที่ยว Booking และค่าใช้จ่ายของทริปของคุณ</p>    <label>Email<input id="loginEmail" type="email" autocomplete="email" placeholder="you@example.com"></label>    <button class="primary-btn wide" onclick="sendMagicLink()">ส่ง Login Link</button>    <div id="authMessage" class="auth-message">ใช้ Magic Link · ไม่ต้องตั้ง password</div>  </div></div><div id="appShell" class="app-shell hidden">
   <header class="topbar">
     <div>
-      <div class="eyebrow">17–25 DEC 2026 · 2 PEOPLE</div>
-      <h1>Chongqing → Chengdu</h1>
+      <div class="eyebrow">TRIP PLANNING</div>
+      <h1>Trip Planning</h1>
     </div>
     <div class="top-actions">
-      <button class="mode-pill" id="modePill" onclick="openCloudPanel()">Demo · ตั้งค่า</button>
+      <button class="mode-pill" id="modePill" onclick="openCloudPanel()">กำลังตรวจสอบ…</button>
       <button class="icon-btn" onclick="openTripInfo()" aria-label="Trip info">ⓘ</button>
     </div>
   </header>
@@ -25,8 +25,8 @@
       <div class="hero">
         <div class="hero-copy">
           <div class="eyebrow">YOUR TRIP AT A GLANCE</div>
-          <h2>เที่ยวตามแผน<br>แต่ไม่ต้องจำทุกอย่างเอง</h2>
-          <p>แผนเที่ยว · Booking · ค่าใช้จ่าย · ยอดที่ต้องเคลียร์</p>
+          <h2>ทริปของคุณ<br>จัดการได้ในที่เดียว</h2>
+          <p>วางแผน · Booking · ค่าใช้จ่าย · ยอดที่ต้องเคลียร์</p>
         </div>
         <div class="hero-route">
           <span>🇨🇳 Chongqing</span><i>→</i><span>🐼 Chengdu</span>
@@ -58,7 +58,7 @@
     </section>
 
     <section id="plan" class="page">
-      <div class="page-heading"><div><div class="eyebrow">ITINERARY</div><h2>แผนเที่ยว</h2><small>กดแต่ละวันเพื่อเปิดรายละเอียด</small></div></div>
+      <div class="page-heading"><div><div class="eyebrow">PLANNING</div><h2>Planning</h2><small>ปรับวัน เมือง และกิจกรรมได้เลย</small></div><button class="primary-btn" onclick="addPlanDay()">+ เพิ่มวัน</button></div>
       <div class="city-tabs">
         <button class="tab active" onclick="filterDays('all',this)">ทั้งหมด</button>
         <button class="tab" onclick="filterDays('Chongqing',this)">Chongqing</button>
