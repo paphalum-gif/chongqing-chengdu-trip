@@ -48,6 +48,7 @@ const isCloud = () => !!(sb && session && cloudTrip);
 
 function currentNames(){
   if(cloudMembers.length>=2) return {A: cloudMembers[0], B: cloudMembers[1]};
+  if(cloudMembers.length===1) return {A: cloudMembers[0], B:{id:'B',display_name:'B'}};
   return {A:{id:'A',display_name:'A'}, B:{id:'B',display_name:'B'}};
 }
 
@@ -58,9 +59,14 @@ function go(id){
 }
 
 function render(){
+  const gate=document.querySelector('#authGate'), shell=document.querySelector('#appShell');
+  const loggedIn=!!session;
+  gate?.classList.toggle('hidden',loggedIn);
+  shell?.classList.toggle('hidden',!loggedIn);
+  if(!loggedIn) return;
   renderHome(); renderPlan(); renderBookings(); renderExpenses(); renderSettlement();
   const pill=document.querySelector('#modePill');
-  if(pill) pill.textContent = isCloud() ? '☁ Cloud' : (hasCloudConfig ? 'Demo · Login' : 'Demo');
+  if(pill) pill.textContent = isCloud() ? '☁ Connected' : 'Cloud';
 }
 
 function renderHome(){
@@ -86,7 +92,17 @@ function formatDate(d){
 
 function renderPlan(){
   const filtered=state.days.filter(d=>dayFilter==='all'||d[2]===dayFilter||(dayFilter==='Chengdu'&&d[2]==='Travel'));
-  document.querySelector('#days').innerHTML=filtered.map((d,idx)=>`<details class="day-card" ${idx===0?'open':''}><summary><span class="day-number">D${esc(d[0])}</span><span class="day-meta"><b>${esc(d[1])}</b><small>${esc(d[2])}</small></span><span class="chev">⌄</span></summary><div class="day-content">${d[3].map((item,i)=>`<div class="stop"><span class="stop-num">${i+1}</span><span>${esc(item)}</span></div>`).join('')}</div></details>`).join('');
+  document.querySelector('#days').innerHTML=filtered.map((d,idx)=>{
+    const originalIndex=state.days.indexOf(d);
+    return `<details class="day-card" ${idx===0?'open':''}>
+      <summary><span class="day-number">D${esc(d[0])}</span><span class="day-meta"><b>${esc(d[1])}</b><small>${esc(d[2])}</small></span><span class="chev">⌄</span></summary>
+      <div class="day-content">
+        <div class="day-edit-row"><span class="plan-title">${esc(d[5]||('Day '+d[0]))}</span><button class="small-btn" onclick="event.preventDefault();openPlanEditor(${originalIndex})">แก้ไขวันนี้</button></div>
+        ${d[3].map((item,i)=>`<div class="stop"><span class="stop-num">${i+1}</span><span>${esc(item)}</span></div>`).join('')}
+        ${d[3].length===0?'<div class="empty-plan">ยังไม่มีกิจกรรม · กด “แก้ไขวันนี้” เพื่อเพิ่ม</div>':''}
+      </div>
+    </details>`;
+  }).join('') || '<div class="empty-card">ยังไม่มีวันในแผน</div>';
 }
 
 function renderBookings(){
@@ -167,21 +183,87 @@ async function submitExpense(){
   saveLocal();closeModal();render();
 }
 
+function dateForInput(value){
+  return /^\\d{4}-\\d{2}-\\d{2}$/.test(value)?value:'';
+}
+
+function openPlanEditor(index){
+  if(!session){return;}
+  const d=state.days[index];
+  if(!d)return;
+  openModal(`<div class="modal-title"><div><div class="eyebrow">EDIT DAY ${esc(d[0])}</div><h3>ปรับแผนวันนี้</h3></div></div>
+    <div class="form-grid">
+      <label>วันที่<input id="pDate" type="date" value="${esc(dateForInput(d[1]))}"></label>
+      <label>เมือง<input id="pCity" value="${esc(d[2]||'')}"></label>
+    </div>
+    <label>ชื่อวัน / จุดประสงค์<input id="pTitle" value="${esc(d[5]||('Day '+d[0]))}" placeholder="เช่น Chongqing · Old Town & Night View"></label>
+    <label>กิจกรรม <small>หนึ่งบรรทัดต่อ 1 กิจกรรม</small><textarea id="pNotes" rows="8" placeholder="10:00 ออกจากโรงแรม\n11:30 午餐\n14:00 ...">${esc(d[3].join('\\n'))}</textarea></label>
+    <button class="primary-btn wide" onclick="savePlanDay(${index})">บันทึกแผน</button>`);
+}
+
+async function savePlanDay(index){
+  const d=state.days[index];
+  const payload={plan_date:document.querySelector('#pDate').value||null,city:document.querySelector('#pCity').value.trim(),title:document.querySelector('#pTitle').value.trim()||('Day '+d[0]),notes:document.querySelector('#pNotes').value.split('\\n').map(x=>x.trim()).filter(Boolean).join(' · ')};
+  if(isCloud()){
+    const {error}=await sb.from('daily_plans').update(payload).eq('id',d[4]);
+    if(error){alert(error.message);return;}
+  }
+  d[1]=payload.plan_date||''; d[2]=payload.city; d[5]=payload.title; d[3]=payload.notes?payload.notes.split(' · '):[];
+  saveLocal(); closeModal(); renderPlan(); renderHome();
+}
+
+function addPlanDay(){
+  if(!session){return;}
+  const nextNo=state.days.reduce((m,d)=>Math.max(m,Number(d[0])||0),0)+1;
+  openModal(`<div class="modal-title"><div><div class="eyebrow">NEW DAY</div><h3>เพิ่มวันในแผน</h3></div></div>
+    <div class="form-grid">
+      <label>วันที่<input id="pDate" type="date"></label>
+      <label>เมือง<input id="pCity" placeholder="Chongqing / Chengdu"></label>
+    </div>
+    <label>ชื่อวัน / จุดประสงค์<input id="pTitle" value="Day ${nextNo}"></label>
+    <label>กิจกรรม <small>หนึ่งบรรทัดต่อ 1 กิจกรรม</small><textarea id="pNotes" rows="7" placeholder="เพิ่มกิจกรรมทีละบรรทัด"></textarea></label>
+    <button class="primary-btn wide" onclick="saveNewPlanDay(${nextNo})">เพิ่มวัน</button>`);
+}
+
+async function saveNewPlanDay(dayNo){
+  const payload={trip_id:cloudTrip.id,day_no:dayNo,plan_date:document.querySelector('#pDate').value||null,city:document.querySelector('#pCity').value.trim(),title:document.querySelector('#pTitle').value.trim()||('Day '+dayNo),notes:document.querySelector('#pNotes').value.split('\\n').map(x=>x.trim()).filter(Boolean).join(' · '),sort_order:dayNo};
+  const {data,error}=await sb.from('daily_plans').insert(payload).select().single();
+  if(error){alert(error.message);return;}
+  state.days.push([String(data.day_no),data.plan_date||'',data.city||'',(data.notes||'').split(' · ').filter(Boolean),data.id,data.title]);
+  state.days.sort((a,b)=>Number(a[0])-Number(b[0]));
+  saveLocal(); closeModal(); renderPlan(); renderHome();
+}
+
 function openTripInfo(){
   openModal(`<div class="modal-title"><div><div class="eyebrow">TRIP INFO</div><h3>Chongqing → Chengdu</h3></div></div><div class="info-grid"><div><small>Dates</small><b>17–25 Dec 2026</b></div><div><small>People</small><b>${cloudMembers.length||2} people</b></div><div><small>Hotel · Chongqing</small><b>Anchor-Anzhou</b></div><div><small>Hotel · Chengdu</small><b>Do A LAND LAB</b></div></div><div class="note">${isCloud()?'☁ ข้อมูล sync ผ่าน Supabase':'Demo Mode · ข้อมูลอยู่ใน browser เครื่องนี้'}</div>`);
 }
 
 function openCloudPanel(){
-  if(!hasCloudConfig){openModal(`<div class="modal-title"><div class="eyebrow">CLOUD SYNC</div><h3>ยังไม่ได้ตั้งค่า Supabase</h3></div><p>ใส่ Project URL และ Publishable key ใน <b>config.js</b> แล้ว deploy ใหม่</p>`);return;}
-  if(session){openModal(`<div class="modal-title"><div class="eyebrow">CLOUD SYNC</div><h3>เชื่อมต่อแล้ว ☁</h3></div><p>${esc(session.user.email||'Signed in')}</p><p>Trip code: <b>${esc(cloudTrip?.share_code||'—')}</b></p><button class="primary-btn wide" onclick="signOut()">ออกจากระบบ</button>`);return;}
-  openModal(`<div class="modal-title"><div class="eyebrow">CLOUD SYNC</div><h3>เข้าใช้งานทริป</h3></div><p>ใช้ Magic Link ไม่ต้องตั้ง password</p><label>Email<input id="loginEmail" type="email" placeholder="you@example.com"></label><button class="primary-btn wide" onclick="sendMagicLink()">ส่ง Login Link</button><div class="note">ถ้าอีกคนมี Trip Code ให้ใช้ปุ่ม Join Trip หลัง login</div>`);
+  if(!hasCloudConfig){openModal(`<div class="modal-title"><div class="eyebrow">CLOUD SYNC</div><h3>ยังไม่ได้ตั้งค่า Supabase</h3></div><p>ตรวจ config.js ก่อนใช้งาน</p>`);return;}
+  if(session){
+    openModal(`<div class="modal-title"><div class="eyebrow">ACCOUNT</div><h3>เชื่อมต่อแล้ว ☁</h3></div><p>${esc(session.user.email||'Signed in')}</p><p>Trip Code: <b>${esc(cloudTrip?.share_code||'—')}</b></p><div class="note">แชร์ Trip Code นี้ให้อีกคน แล้วให้อีกคน login และกด Join Trip</div><button class="secondary-btn wide" onclick="openJoinPanel()">Join Trip</button><button class="primary-btn wide" onclick="signOut()">ออกจากระบบ</button>`);
+  }
 }
 
 async function sendMagicLink(){
-  const email=document.querySelector('#loginEmail').value.trim(); if(!email)return;
-  const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname}});
-  if(error){alert(error.message);return;}
-  document.querySelector('#modalBody').innerHTML=`<div class="modal-title"><div class="eyebrow">CHECK EMAIL</div><h3>ส่ง Login Link แล้ว</h3></div><p>เปิดอีเมล <b>${esc(email)}</b> แล้วกดลิงก์เพื่อกลับเข้าเว็บ</p>`;
+  const email=document.querySelector('#loginEmail')?.value.trim();
+  const msg=document.querySelector('#authMessage');
+  if(!email){ if(msg) msg.textContent='กรอกอีเมลก่อน'; return; }
+  if(!sb){ if(msg) msg.textContent='ยังเชื่อมต่อ Cloud ไม่สำเร็จ'; return; }
+  const redirectTo='https://chongqing-chengdu-trip.netlify.app/';
+  if(msg) msg.textContent='กำลังส่ง Login Link…';
+  try{
+    const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:redirectTo}});
+    if(error) throw error;
+    const modalBody=document.querySelector('#modalBody');
+    if(modalBody) modalBody.innerHTML=`<div class="modal-title"><div class="eyebrow">CHECK EMAIL</div><h3>ส่ง Login Link แล้ว</h3></div><p>เปิดอีเมล <b>${esc(email)}</b> แล้วกดลิงก์เพื่อกลับเข้า Trip Planning</p><div class="note">ถ้าไม่เห็นอีเมล ให้เช็ก Spam / Promotions และรอประมาณ 1 นาที</div>`;
+    if(msg) msg.textContent='ส่งแล้ว · เช็กอีเมลของคุณ';
+  }catch(error){
+    console.error('Magic Link error',error);
+    const detail=error?.message||error?.name||'Unknown auth error';
+    if(msg) msg.textContent=`ส่งไม่สำเร็จ: ${detail}`;
+    else alert(`ส่ง Login Link ไม่สำเร็จ: ${detail}`);
+  }
 }
 
 async function signOut(){await sb.auth.signOut();session=null;cloudTrip=null;cloudMembers=[];state=JSON.parse(localStorage.getItem(KEY)||'null')||structuredClone(seed);closeModal();render();}
@@ -213,7 +295,7 @@ async function loadCloudTrip(){
     sb.from('expenses').select('*, expense_splits(*)').eq('trip_id',cloudTrip.id).order('expense_date')
   ]);
   cloudMembers=m.data||[];
-  state.days=(d.data||[]).map(x=>[String(x.day_no),formatDate(x.plan_date),x.city,(x.notes||'').split(' · ')]);
+  state.days=(d.data||[]).map(x=>[String(x.day_no),x.plan_date||'',x.city||'',(x.notes||'').split(' · ').filter(Boolean),x.id,x.title||('Day '+x.day_no)]);
   state.bookings=(b.data||[]).map(x=>({id:x.id,title:x.title,date:x.booking_date,status:x.status,provider:x.provider||'',ref:x.reference||'',url:x.booking_url||''}));
   const names=currentNames();
   state.expenses=(e.data||[]).map(x=>{
@@ -239,14 +321,28 @@ function openJoinPanel(){
 }
 
 async function bootCloud(){
-  if(!sb)return;
-  const {data}=await sb.auth.getSession(); session=data.session;
-  sb.auth.onAuthStateChange(async (_event,s)=>{session=s;if(session){await ensureCloudTrip();}else{render();}});
-  if(session) await ensureCloudTrip();
+  if(!sb){render();return;}
+  const {data,error}=await sb.auth.getSession();
+  if(error) console.error('Auth session error',error);
+  session=data?.session||null;
+  render();
+  sb.auth.onAuthStateChange(async (_event,s)=>{
+    session=s||null;
+    if(session){
+      render();
+      try{ await ensureCloudTrip(); }catch(err){ console.error('Cloud trip load error',err); render(); }
+    }else{
+      cloudTrip=null; cloudMembers=[];
+      render();
+    }
+  });
+  if(session){
+    try{await ensureCloudTrip();}catch(err){console.error('Cloud trip load error',err);}
+  }
   render();
 }
 
-window.openCloudPanel=openCloudPanel; window.openTripInfo=openTripInfo; window.openJoinPanel=openJoinPanel; window.go=go;
+window.openCloudPanel=openCloudPanel; window.openTripInfo=openTripInfo; window.openJoinPanel=openJoinPanel; window.openPlanEditor=openPlanEditor; window.addPlanDay=addPlanDay; window.savePlanDay=savePlanDay; window.saveNewPlanDay=saveNewPlanDay; window.go=go;
 window.filterBooks=filterBooks;window.filterDays=filterDays;window.toggleBook=toggleBook;window.settleExp=settleExp;window.addBooking=addBooking;window.addExpense=addExpense;window.submitBooking=submitBooking;window.submitExpense=submitExpense;window.setEqualSplit=setEqualSplit;window.setCustomSplit=setCustomSplit;window.sendMagicLink=sendMagicLink;window.signOut=signOut;window.joinTrip=joinTrip;
 
 render(); bootCloud();
