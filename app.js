@@ -241,6 +241,10 @@ function openTripInfo(){
 function openCloudPanel(){
   if(!hasCloudConfig){openModal(`<div class="modal-title"><div class="eyebrow">CLOUD SYNC</div><h3>ยังไม่ได้ตั้งค่า Supabase</h3></div><p>ตรวจ config.js ก่อนใช้งาน</p>`);return;}
   if(session){
+    if(!cloudTrip){
+      openTripStartPanel();
+      return;
+    }
     openModal(`<div class="modal-title"><div class="eyebrow">ACCOUNT</div><h3>เชื่อมต่อแล้ว ☁</h3></div><p>${esc(session.user.email||'Signed in')}</p><p>Trip Code: <b>${esc(cloudTrip?.share_code||'—')}</b></p><div class="note">แชร์ Trip Code นี้ให้อีกคน แล้วให้อีกคน login และกด Join Trip</div><button class="secondary-btn wide" onclick="openJoinPanel()">Join Trip</button><button class="primary-btn wide" onclick="signOut()">ออกจากระบบ</button>`);
   }
 }
@@ -269,16 +273,38 @@ async function sendMagicLink(){
 async function signOut(){await sb.auth.signOut();session=null;cloudTrip=null;cloudMembers=[];state=JSON.parse(localStorage.getItem(KEY)||'null')||structuredClone(seed);closeModal();render();}
 
 async function ensureCloudTrip(){
-  const {data:mine}=await sb.from('trips').select('*').order('created_at',{ascending:true}).limit(1);
-  if(mine?.length){cloudTrip=mine[0];}
-  else{
-    const {data,error}=await sb.from('trips').insert({name:'Chongqing → Chengdu',start_date:'2026-12-17',end_date:'2026-12-25',currency:'THB',created_by:session.user.id}).select().single();
-    if(error){console.error(error);return;}
-    cloudTrip=data;
-    await sb.from('trip_members').insert({trip_id:data.id,user_id:session.user.id,display_name:'A'});
-    await seedCloudTrip();
+  const {data:mine,error}=await sb.from('trips').select('*').order('created_at',{ascending:true}).limit(1);
+  if(error){console.error('Trip lookup error',error);return;}
+  if(mine?.length){
+    cloudTrip=mine[0];
+    await loadCloudTrip();
+    return;
   }
+  // Do not silently create a trip. Let the user choose Create or Join.
+  cloudTrip=null; cloudMembers=[];
+  state={days:[],bookings:[],expenses:[]}; saveLocal(); render();
+  openTripStartPanel();
+}
+
+function openTripStartPanel(){
+  if(!session)return;
+  openModal(`<div class="modal-title"><div class="eyebrow">WELCOME TO TRIP PLANNING</div><h3>เลือกทริปที่จะเข้า</h3></div>
+    <p>คุณ login แล้ว แต่ยังไม่มีทริปในบัญชีนี้</p>
+    <button class="primary-btn wide" onclick="createTrip()">สร้างทริปใหม่</button>
+    <button class="secondary-btn wide" onclick="openJoinPanel()">มี Trip Code อยู่แล้ว · Join Trip</button>`);
+}
+
+async function createTrip(){
+  if(!session)return;
+  const {data,error}=await sb.from('trips').insert({name:'My Trip',start_date:null,end_date:null,currency:'THB',created_by:session.user.id}).select().single();
+  if(error){alert(error.message);return;}
+  const {error:memberError}=await sb.from('trip_members').insert({trip_id:data.id,user_id:session.user.id,display_name:'A'});
+  if(memberError){alert(memberError.message);return;}
+  cloudTrip=data;
+  await seedCloudTrip();
   await loadCloudTrip();
+  closeModal();
+  render();
 }
 
 async function seedCloudTrip(){
@@ -342,7 +368,7 @@ async function bootCloud(){
   render();
 }
 
-window.openCloudPanel=openCloudPanel; window.openTripInfo=openTripInfo; window.openJoinPanel=openJoinPanel; window.openPlanEditor=openPlanEditor; window.addPlanDay=addPlanDay; window.savePlanDay=savePlanDay; window.saveNewPlanDay=saveNewPlanDay; window.go=go;
+window.openCloudPanel=openCloudPanel; window.openTripInfo=openTripInfo; window.openJoinPanel=openJoinPanel; window.openTripStartPanel=openTripStartPanel; window.createTrip=createTrip; window.openPlanEditor=openPlanEditor; window.addPlanDay=addPlanDay; window.savePlanDay=savePlanDay; window.saveNewPlanDay=saveNewPlanDay; window.go=go;
 window.filterBooks=filterBooks;window.filterDays=filterDays;window.toggleBook=toggleBook;window.settleExp=settleExp;window.addBooking=addBooking;window.addExpense=addExpense;window.submitBooking=submitBooking;window.submitExpense=submitExpense;window.setEqualSplit=setEqualSplit;window.setCustomSplit=setCustomSplit;window.sendMagicLink=sendMagicLink;window.signOut=signOut;window.joinTrip=joinTrip;
 
 render(); bootCloud();
