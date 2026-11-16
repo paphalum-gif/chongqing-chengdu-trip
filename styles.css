@@ -84,3 +84,5 @@ small{color:var(--muted)}
   .form-grid{grid-template-columns:1fr}
   .day-edit-row{align-items:flex-start}
 }
+
+.auth-switch{display:block;width:100%;margin-top:10px;border:0;background:transparent;color:var(--accent);font-weight:800;padding:10px;cursor:pointer}.auth-switch:hover{text-decoration:underline}.auth-card button:disabled{opacity:.6;cursor:wait}
