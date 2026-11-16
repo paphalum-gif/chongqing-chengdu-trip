@@ -1,22 +1,26 @@
-# Trip Dashboard v2
+# Trip Dashboard v4 — UX + Supabase-ready
 
-Chongqing → Chengdu Trip Dashboard MVP.
+This version applies the UX review and adds real Supabase reads/writes for the core flow.
 
-## Files
-- `index.html` — app shell
-- `app.js` — trip UI and demo data
-- `styles.css` — responsive styling
-- `config.js` — Supabase URL + publishable/anon key
-- `config.example.js` — config template
-- `supabase.sql` — database, RLS, storage bucket, and realtime starter setup
+## UX
+- Action-first Home
+- Collapsed day itinerary
+- Booking filters and one-tap status update
+- Expense entry defaults to equal split
+- Net settlement view
+- Mobile bottom navigation
+- Cloud status indicator
 
-## Supabase setup
-1. Create a Supabase project.
-2. Open SQL Editor.
-3. Paste and run `supabase.sql`.
-4. Open `config.js` and replace the two placeholders.
-5. Deploy the folder to Netlify.
+## Supabase
+- `index.html` loads Supabase JS v2 from CDN.
+- `config.js` holds Project URL + Publishable key.
+- `supabase.sql` creates the matching schema and a `join_trip_by_code` RPC.
+- Login uses Supabase Magic Link.
+- First signed-in user can create the trip automatically.
+- Booking and expense changes write to Supabase.
+- Trip members can join by share code.
 
-Do not put a Supabase service-role key in the browser. Use the publishable/anon key only.
+## Important
+Use the Supabase Publishable key only in `config.js`. Never use a Secret key in browser code.
 
-The current UI still has demo/local data. The SQL schema is ready for the next integration step where `app.js` is switched from LocalStorage to Supabase reads/writes.
+After changing config.js, deploy the folder to GitHub/Netlify.
