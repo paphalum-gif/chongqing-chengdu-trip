@@ -284,3 +284,10 @@ end;
 $$;
 
 grant execute on function public.join_trip_by_code(text,text) to authenticated;
+
+-- Security hardening: keep helper/RPC functions out of anonymous/public execution.
+revoke execute on function public.is_trip_member(uuid) from public, anon, authenticated;
+grant execute on function public.is_trip_member(uuid) to authenticated;
+
+revoke execute on function public.join_trip_by_code(text,text) from public, anon;
+grant execute on function public.join_trip_by_code(text,text) to authenticated;
