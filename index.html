@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div id="authGate" class="auth-gate">  <div class="auth-card">    <div class="auth-mark">✦</div>    <div class="eyebrow">TRIP PLANNING</div>    <h1>วางแผนทริปให้เป็นเรื่องง่าย</h1>    <p>เข้าสู่ระบบเพื่อดูแผนเที่ยว Booking และค่าใช้จ่ายของทริปของคุณ</p>    <label>Email<input id="loginEmail" type="email" autocomplete="email" placeholder="you@example.com"></label>    <button class="primary-btn wide" onclick="sendMagicLink()">ส่ง Login Link</button>    <div id="authMessage" class="auth-message">ใช้ Magic Link · ไม่ต้องตั้ง password</div>  </div></div><div id="appShell" class="app-shell hidden">
+<div id="authGate" class="auth-gate">  <div class="auth-card">    <div class="auth-mark">✦</div>    <div class="eyebrow">TRIP PLANNING</div>    <h1 id="authTitle">เข้าสู่ Trip Planning</h1>    <p id="authSubtitle">เข้าสู่ระบบเพื่อดูแผนเที่ยว Booking และค่าใช้จ่ายของทริปคุณ</p>    <label>Email<input id="loginEmail" type="email" autocomplete="email" placeholder="you@example.com"></label>    <label>Password<input id="loginPassword" type="password" autocomplete="current-password" placeholder="อย่างน้อย 6 ตัวอักษร"></label>    <button class="primary-btn wide" id="authSubmit" onclick="submitPasswordAuth()">เข้าสู่ระบบ</button>    <button class="auth-switch" id="authSwitch" onclick="toggleAuthMode()">ยังไม่มีบัญชี? สมัครบัญชี</button>    <div id="authMessage" class="auth-message">เข้าสู่ระบบด้วย Email + Password · ไม่ต้องใช้ Magic Link</div>  </div></div><div id="appShell" class="app-shell hidden">
   <header class="topbar">
     <div>
       <div class="eyebrow">TRIP PLANNING</div>
